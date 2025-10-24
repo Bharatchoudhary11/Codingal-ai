@@ -102,7 +102,7 @@ def test_create_attempt_validates_and_persists_attempt(client, sample_data):
         "duration_sec": 1200,
         "code_snapshot": "print('hello')",
     }
-    response = client.post(reverse("attempt-create"), data=payload, format="json")
+    response = client.post(reverse("attempt-collection"), data=payload, format="json")
     assert response.status_code == 201
     attempt = Attempt.objects.get(pk=response.json()["id"])
     assert attempt.student == student
@@ -121,7 +121,7 @@ def test_create_attempt_rejects_bad_payload(client, sample_data):
         "hints_used": 100,
         "duration_sec": 0,
     }
-    response = client.post(reverse("attempt-create"), data=payload, format="json")
+    response = client.post(reverse("attempt-collection"), data=payload, format="json")
     assert response.status_code == 400
     errors = response.json()
     assert "timestamp" in errors or "correctness" in errors
@@ -131,14 +131,22 @@ def test_create_attempt_rejects_bad_payload(client, sample_data):
 @pytest.mark.django_db
 def test_analyze_code_reports_static_issues(client):
     code = """
-try:\n    print('hello')\nexcept:\n    pass\n\n
-def greet(name, unused):\n    print(name)
+spare = 5
+
+def review(items, flag):
+    total = 0
+    for index in range(len(items) + 1):
+        total += items[index]
+    if flag:
+        print('duplicate')
+    else:
+        print('duplicate')
 """
     response = client.post(reverse("analyze-code"), data={"code": code}, format="json")
     assert response.status_code == 200
     payload = response.json()
     rules = {issue["rule"] for issue in payload["issues"]}
-    assert {"bare-except", "print-call", "unused-argument"}.issubset(rules)
+    assert {"unused-variable", "for-loop-off-by-one", "missing-return", "duplicate-block"}.issubset(rules)
 
 
 @pytest.mark.django_db

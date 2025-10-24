@@ -1,2 +1,20 @@
 import type { Recommendation } from './recommender'
-export function formatExplanation(rec:Recommendation){const lines=[`Recommendation: ${rec.title}`,`Method: ${rec.method}`,`Confidence: ${rec.confidence.toFixed(2)}`,`Reasoning features:`,...Object.entries(rec.reasonFeatures).map(([k,v])=>`  - ${k}: ${v}`),...(rec.alternatives?.length?['Alternatives:',...rec.alternatives.map((a,i)=>`  ${i+1}. ${a.title} — ${a.reason}`)]:[]),'Limitations: Simple heuristic baseline. Replace with richer features/tiny local model.'];return lines.join('\n')}
+
+export function formatExplanation(rec: Recommendation) {
+  const lines = [
+    `Recommendation: ${rec.title}`,
+    `Method: ${rec.method}`,
+    `Confidence: ${rec.confidence.toFixed(2)}`,
+    'Reasoning features:',
+    ...Object.entries(rec.reasonFeatures).map(([key, value]) => `  - ${key}: ${value}`),
+    ...(rec.alternatives?.length
+      ? [
+          'Alternatives:',
+          ...rec.alternatives.map((option, index) => `  ${index + 1}. ${option.title} — ${option.reason}`),
+        ]
+      : []),
+    'Limitations: Simple heuristic baseline. Replace with richer features or a local model when available.',
+  ]
+
+  return lines.join('\n')
+}

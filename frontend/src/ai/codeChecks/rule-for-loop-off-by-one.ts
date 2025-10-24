@@ -1,2 +1,55 @@
-import { parse } from '@babel/parser'; import type { Issue } from './index'
-export function checkForLoopOffByOne(code:string):Issue[]{const ast=parse(code,{sourceType:'module',plugins:['jsx','typescript']});const issues:Issue[]=[];function tr(n:any){if(!n||typeof n!=='object')return;if(n.type==='ForStatement'){const t=n.test;if(t&&t.type==='BinaryExpression'&&t.operator==='<='){issues.push({rule:'for-loop-off-by-one',message:'Potential off-by-one: use "<" instead of "<=" when iterating to length.',severity:'info',fixHint:'Change "<=" to "<" for array length bounds.'})}}for(const k of Object.keys(n)){const c=(n as any)[k];if(Array.isArray(c))c.forEach(tr);else tr(c)}}tr(ast);return issues}
+import { parse } from '@babel/parser'
+
+import type { Issue } from './index'
+
+const parserOptions = {
+  sourceType: 'module' as const,
+  plugins: ['jsx', 'typescript'] as const,
+  errorRecovery: true,
+}
+
+function isLengthMember(node: any) {
+  return (
+    node &&
+    node.type === 'MemberExpression' &&
+    !node.computed &&
+    node.property?.type === 'Identifier' &&
+    node.property.name === 'length'
+  )
+}
+
+export function checkForLoopOffByOne(code: string): Issue[] {
+  const ast = parse(code, parserOptions)
+  const issues: Issue[] = []
+
+  function visit(node: any) {
+    if (!node || typeof node !== 'object') return
+
+    if (node.type === 'ForStatement' && node.test?.type === 'BinaryExpression') {
+      const test = node.test
+      if (
+        test.operator === '<=' &&
+        (isLengthMember(test.right) || (test.right?.type === 'BinaryExpression' && isLengthMember(test.right.left)))
+      ) {
+        issues.push({
+          rule: 'for-loop-off-by-one',
+          message: 'Potential off-by-one: prefer "<" when comparing against array.length.',
+          severity: 'info',
+          fixHint: 'Change "<=" to "<" to avoid reading past the end of the array.',
+          location: test.loc?.start
+            ? { line: test.loc.start.line, column: test.loc.start.column }
+            : undefined,
+        })
+      }
+    }
+
+    for (const key of Object.keys(node)) {
+      const child = (node as any)[key]
+      if (Array.isArray(child)) child.forEach(visit)
+      else visit(child)
+    }
+  }
+
+  visit(ast.program)
+  return issues
+}
