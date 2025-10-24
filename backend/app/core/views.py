@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import ast
 from collections import defaultdict
-from typing import Dict, Iterable, List, Optional
+from dataclasses import dataclass, field
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from django.db.models import Prefetch
 from django.utils import timezone
@@ -243,52 +244,256 @@ def _issue(rule: str, message: str, severity: str, node: ast.AST) -> Dict[str, o
     }
 
 
+@dataclass
+class _Scope:
+    label: str
+    assigned: Dict[str, ast.AST] = field(default_factory=dict)
+    used: Dict[str, bool] = field(default_factory=dict)
+
+
+class _StaticAnalyzer(ast.NodeVisitor):
+    """Lightweight deterministic Python AST checker."""
+
+    def __init__(self) -> None:
+        self.issues: List[Dict[str, object]] = []
+        self._scopes: List[_Scope] = [_Scope(label="module")]
+        self._block_signatures: Dict[Tuple[str, ...], Tuple[int, int]] = {}
+
+    # ------------------------------------------------------------------
+    # Scope helpers
+    # ------------------------------------------------------------------
+    @property
+    def current_scope(self) -> _Scope:
+        return self._scopes[-1]
+
+    def _enter_scope(self, label: str) -> None:
+        self._scopes.append(_Scope(label=label))
+
+    def _leave_scope(self) -> None:
+        scope = self._scopes.pop()
+        for name, node in scope.assigned.items():
+            if scope.used.get(name):
+                continue
+            self.issues.append(
+                _issue(
+                    "unused-variable",
+                    f'Variable "{name}" is assigned but never used in {scope.label}.',
+                    "info",
+                    node,
+                )
+            )
+
+    def _record_assignment(self, target: ast.AST) -> None:
+        if isinstance(target, ast.Name):
+            name = target.id
+            if name.startswith("_"):
+                return
+            self.current_scope.assigned.setdefault(name, target)
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            for element in target.elts:
+                self._record_assignment(element)
+
+    def _mark_used(self, name: str) -> None:
+        for scope in reversed(self._scopes):
+            if name in scope.assigned:
+                scope.used[name] = True
+                break
+
+    # ------------------------------------------------------------------
+    # Block helpers
+    # ------------------------------------------------------------------
+    def _record_block(self, statements: Sequence[ast.stmt]) -> None:
+        if not statements:
+            return
+        signature = tuple(ast.dump(stmt, include_attributes=False) for stmt in statements)
+        if not signature:
+            return
+        first = statements[0]
+        location = (
+            getattr(first, "lineno", None),
+            getattr(first, "col_offset", None),
+        )
+        if signature not in self._block_signatures:
+            if location[0] is not None:
+                self._block_signatures[signature] = location
+            return
+
+        if location[0] is None:
+            return
+        dummy = statements[0]
+        self.issues.append(
+            _issue(
+                "duplicate-block",
+                "Duplicate block detected. Extract shared statements to avoid repetition.",
+                "info",
+                dummy,
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # Visitor overrides
+    # ------------------------------------------------------------------
+    def visit_Module(self, node: ast.Module) -> None:  # pragma: no cover - exercised indirectly
+        self._record_block(node.body)
+        self.generic_visit(node)
+        self._leave_scope()
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._record_block(node.body)
+        self._enter_scope(f"function {node.name}")
+        for arg in (*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs):
+            if arg.arg and not arg.arg.startswith("_"):
+                self.current_scope.used[arg.arg] = True
+        if node.args.vararg:
+            self.current_scope.used[node.args.vararg.arg] = True
+        if node.args.kwarg:
+            self.current_scope.used[node.args.kwarg.arg] = True
+        self.generic_visit(node)
+        has_return_value = any(
+            isinstance(child, ast.Return) and child.value is not None for child in ast.walk(node)
+        )
+        has_yield = any(isinstance(child, (ast.Yield, ast.YieldFrom)) for child in ast.walk(node))
+        if not has_return_value and not has_yield and node.body:
+            self.issues.append(
+                _issue(
+                    "missing-return",
+                    f'Function "{node.name}" does not return a value on any path.',
+                    "warning",
+                    node,
+                )
+            )
+        self._leave_scope()
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self.visit_FunctionDef(node)  # type: ignore[arg-type]
+
+    def visit_For(self, node: ast.For) -> None:
+        self._record_block(node.body)
+        self._record_block(node.orelse)
+        self._record_assignment(node.target)
+        self._check_for_loop(node)
+        self.generic_visit(node)
+
+    def visit_AsyncFor(self, node: ast.AsyncFor) -> None:
+        self.visit_For(node)  # type: ignore[arg-type]
+
+    def visit_With(self, node: ast.With) -> None:
+        self._record_block(node.body)
+        for item in node.items:
+            if item.optional_vars:
+                self._record_assignment(item.optional_vars)
+        self.generic_visit(node)
+
+    def visit_If(self, node: ast.If) -> None:
+        self._record_block(node.body)
+        self._record_block(node.orelse)
+        self.generic_visit(node)
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        for target in node.targets:
+            self._record_assignment(target)
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        if node.target:
+            self._record_assignment(node.target)
+        self.generic_visit(node)
+
+    def visit_AugAssign(self, node: ast.AugAssign) -> None:
+        self._record_assignment(node.target)
+        if isinstance(node.target, ast.Name):
+            self._mark_used(node.target.id)
+        self.generic_visit(node)
+
+    def visit_Name(self, node: ast.Name) -> None:
+        if isinstance(node.ctx, ast.Load):
+            self._mark_used(node.id)
+        self.generic_visit(node)
+
+    def visit_Try(self, node: ast.Try) -> None:
+        self._record_block(node.body)
+        self._record_block(node.orelse)
+        self._record_block(node.finalbody)
+        for handler in node.handlers:
+            self._record_block(handler.body)
+        self.generic_visit(node)
+
+    # ------------------------------------------------------------------
+    # Rule implementations
+    # ------------------------------------------------------------------
+    def _check_for_loop(self, node: ast.For) -> None:
+        iterator = node.iter
+        if not (
+            isinstance(iterator, ast.Call)
+            and isinstance(iterator.func, ast.Name)
+            and iterator.func.id == "range"
+            and iterator.args
+        ):
+            return
+
+        last_arg = iterator.args[-1]
+        if isinstance(last_arg, ast.BinOp) and isinstance(last_arg.op, ast.Add):
+            if self._is_len_call(last_arg.left) and self._is_one(last_arg.right):
+                self.issues.append(
+                    _issue(
+                        "for-loop-off-by-one",
+                        "Potential off-by-one: range(len(items) + 1) iterates one past the end.",
+                        "warning",
+                        iterator,
+                    )
+                )
+            elif self._is_len_call(last_arg.right) and self._is_one(last_arg.left):
+                self.issues.append(
+                    _issue(
+                        "for-loop-off-by-one",
+                        "Potential off-by-one: range(len(items) + 1) iterates one past the end.",
+                        "warning",
+                        iterator,
+                    )
+                )
+
+    @staticmethod
+    def _is_len_call(node: ast.AST) -> bool:
+        return (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "len"
+            and len(node.args) == 1
+        )
+
+    @staticmethod
+    def _is_one(node: ast.AST) -> bool:
+        return isinstance(node, ast.Constant) and node.value == 1
+
+
+def _analyze_python_code(code: str) -> List[Dict[str, object]]:
+    tree = ast.parse(code)
+    analyzer = _StaticAnalyzer()
+    analyzer.visit(tree)
+    return analyzer.issues
+
+
 @api_view(["POST"])
 def analyze_code(request):
     serializer = CodeAnalysisSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     code = serializer.validated_data["code"]
 
-    issues: List[Dict[str, object]] = []
     try:
-        tree = ast.parse(code)
-    except SyntaxError as exc:  # pragma: no cover - handled in tests via severity output
-        issues.append(
+        issues = _analyze_python_code(code)
+    except SyntaxError as exc:  # pragma: no cover - surfaced in API tests
+        return Response(
             {
-                "rule": "syntax-error",
-                "message": exc.msg,
-                "severity": "error",
-                "line": exc.lineno,
-                "column": exc.offset,
+                "issues": [
+                    {
+                        "rule": "syntax-error",
+                        "message": exc.msg,
+                        "severity": "error",
+                        "line": exc.lineno,
+                        "column": exc.offset,
+                    }
+                ]
             }
         )
-        return Response({"issues": issues})
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
-            arg_names = {arg.arg for arg in node.args.args}
-            used_args = {
-                child.id
-                for child in ast.walk(node)
-                if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load)
-            }
-            for unused in sorted(arg_names - used_args):
-                issues.append(
-                    _issue(
-                        "unused-argument",
-                        f'Argument "{unused}" in function "{node.name}" is not used.',
-                        "info",
-                        node,
-                    )
-                )
-        elif isinstance(node, ast.ExceptHandler) and node.type is None:
-            issues.append(
-                _issue("bare-except", "Avoid bare except; catch specific exceptions.", "warning", node)
-            )
-        elif isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Name) and node.func.id == "print":
-                issues.append(
-                    _issue("print-call", "Avoid print statements; use logging instead.", "info", node)
-                )
 
     return Response({"issues": issues})
