@@ -45,6 +45,7 @@ describe('code checks', () => {
     const code = `
       const numbers = [1, 2, 3];
       const doubled = numbers.map((value) => value * 2);
+      console.log(doubled.join(','));
       export function sum(values) {
         return values.reduce((accumulator, value) => accumulator + value, 0);
       }
