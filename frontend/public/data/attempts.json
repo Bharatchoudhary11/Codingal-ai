@@ -1,0 +1,26 @@
+[
+  {
+    "studentId": "s1",
+    "courseId": "c1",
+    "lessonId": "py-variables",
+    "timestamp": "2025-10-02T09:30:00Z",
+    "correctness": 0.7,
+    "hintsUsed": 0
+  },
+  {
+    "studentId": "s1",
+    "courseId": "c1",
+    "lessonId": "py-loops",
+    "timestamp": "2025-10-04T12:00:00Z",
+    "correctness": 0.6,
+    "hintsUsed": 1
+  },
+  {
+    "studentId": "s1",
+    "courseId": "c2",
+    "lessonId": "js-arrays",
+    "timestamp": "2025-10-06T10:30:00Z",
+    "correctness": 0.8,
+    "hintsUsed": 0
+  }
+]

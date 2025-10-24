@@ -1,0 +1,32 @@
+[
+  {
+    "id": "c1",
+    "name": "Python Basics",
+    "progress": 35,
+    "tags": [
+      "variables",
+      "loops"
+    ],
+    "lastActivity": "2025-10-05T10:00:00Z"
+  },
+  {
+    "id": "c2",
+    "name": "JavaScript Foundations",
+    "progress": 55,
+    "tags": [
+      "arrays",
+      "conditions"
+    ],
+    "lastActivity": "2025-10-07T10:00:00Z"
+  },
+  {
+    "id": "c3",
+    "name": "Intro to AI Concepts",
+    "progress": 10,
+    "tags": [
+      "logic",
+      "data"
+    ],
+    "lastActivity": "2025-10-01T10:00:00Z"
+  }
+]

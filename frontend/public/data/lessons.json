@@ -1,0 +1,90 @@
+[
+  {
+    "id": "py-variables",
+    "courseId": "c1",
+    "title": "Variables & Types",
+    "order": 1,
+    "tags": ["variables"],
+    "estimatedMinutes": 20
+  },
+  {
+    "id": "py-loops",
+    "courseId": "c1",
+    "title": "For & While Loops",
+    "order": 2,
+    "tags": ["loops"],
+    "estimatedMinutes": 25
+  },
+  {
+    "id": "py-functions",
+    "courseId": "c1",
+    "title": "Functions & Parameters",
+    "order": 3,
+    "tags": ["functions"],
+    "estimatedMinutes": 30
+  },
+  {
+    "id": "py-lists",
+    "courseId": "c1",
+    "title": "Working with Lists",
+    "order": 4,
+    "tags": ["lists"],
+    "estimatedMinutes": 30
+  },
+  {
+    "id": "js-arrays",
+    "courseId": "c2",
+    "title": "Arrays & Iteration",
+    "order": 1,
+    "tags": ["arrays"],
+    "estimatedMinutes": 20
+  },
+  {
+    "id": "js-loops",
+    "courseId": "c2",
+    "title": "Loop Patterns",
+    "order": 2,
+    "tags": ["loops"],
+    "estimatedMinutes": 25
+  },
+  {
+    "id": "js-conditions",
+    "courseId": "c2",
+    "title": "Conditional Logic",
+    "order": 3,
+    "tags": ["conditions"],
+    "estimatedMinutes": 20
+  },
+  {
+    "id": "js-objects",
+    "courseId": "c2",
+    "title": "Objects & Methods",
+    "order": 4,
+    "tags": ["objects"],
+    "estimatedMinutes": 30
+  },
+  {
+    "id": "ai-logic",
+    "courseId": "c3",
+    "title": "Logic Fundamentals",
+    "order": 1,
+    "tags": ["logic"],
+    "estimatedMinutes": 25
+  },
+  {
+    "id": "ai-data",
+    "courseId": "c3",
+    "title": "Data Literacy",
+    "order": 2,
+    "tags": ["data"],
+    "estimatedMinutes": 30
+  },
+  {
+    "id": "ai-models",
+    "courseId": "c3",
+    "title": "Intro to Models",
+    "order": 3,
+    "tags": ["models"],
+    "estimatedMinutes": 35
+  }
+]
