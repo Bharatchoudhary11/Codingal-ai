@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 from collections import defaultdict
+import math
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -120,8 +121,13 @@ def _compute_tag_alignment(course: Course, student: Student) -> float:
 def _serialize_features(result: RecommendationResult) -> Dict[str, Dict[str, float]]:
     serialized: Dict[str, Dict[str, float]] = {}
     for feature in result.features:
+        raw_value = feature.raw_value
+        if isinstance(raw_value, float) and not math.isfinite(raw_value):
+            serialized_value = None
+        else:
+            serialized_value = raw_value
         serialized[feature.key] = {
-            "value": feature.raw_value,
+            "value": serialized_value,
             "normalized": round(feature.normalized_value, 3),
             "weight": feature.weight,
             "contribution": round(feature.contribution, 3),
