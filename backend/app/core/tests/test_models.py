@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from core.models import Attempt, Course, Lesson, Student
@@ -13,7 +13,8 @@ def test_lesson_ordering_and_uniqueness():
     lesson_one = Lesson.objects.create(course=course, title="One", order_index=1)
     Lesson.objects.create(course=course, title="Two", order_index=2)
     with pytest.raises(IntegrityError):
-        Lesson.objects.create(course=course, title="Duplicate", order_index=1)
+        with transaction.atomic():
+            Lesson.objects.create(course=course, title="Duplicate", order_index=1)
     ordered_titles = list(course.lessons.values_list("title", flat=True))
     assert ordered_titles == ["One", "Two"]
     assert str(lesson_one) == "Course: One"
