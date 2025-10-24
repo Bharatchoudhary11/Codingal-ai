@@ -20,6 +20,24 @@ class WriteThrottle(UserRateThrottle):
     rate = "30/min"
 
 
+@api_view(["GET"])
+def service_root(request):
+    return Response(
+        {
+            "service": "Codingal AI Course Coach API",
+            "status": "ok",
+            "endpoints": {
+                "overview": "/api/students/<id>/overview/",
+                "recommendation": "/api/students/<id>/recommendation/",
+                "attempts": {
+                    "GET": "/api/attempts/",
+                    "POST": "/api/attempts/",
+                },
+                "analyze_code": "/api/analyze-code/",
+            },
+        }
+    )
+
 def _get_student(pk: int) -> Optional[Student]:
     return (
         Student.objects.prefetch_related(
@@ -183,9 +201,32 @@ def student_recommendation(request, pk: int):
     return Response(payload)
 
 
-@api_view(["POST"])
+@api_view(["GET", "POST"])
 @throttle_classes([WriteThrottle])
-def create_attempt(request):
+def attempt_collection(request):
+    if request.method == "GET":
+        attempts = (
+            Attempt.objects.select_related("student", "lesson", "lesson__course")
+            .order_by("-timestamp")[:25]
+        )
+        results = [
+            {
+                "id": attempt.id,
+                "student": {"id": attempt.student_id, "name": attempt.student.name},
+                "lesson": {
+                    "id": attempt.lesson_id,
+                    "title": attempt.lesson.title,
+                    "course": attempt.lesson.course.name,
+                },
+                "timestamp": timezone.localtime(attempt.timestamp).isoformat(),
+                "correctness": attempt.correctness,
+                "hints_used": attempt.hints_used,
+                "duration_sec": attempt.duration_sec,
+            }
+            for attempt in attempts
+        ]
+        return Response({"count": len(results), "results": results})
+
     serializer = AttemptCreateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     attempt = serializer.save()

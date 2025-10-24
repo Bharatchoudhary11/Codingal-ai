@@ -10,6 +10,6 @@ urlpatterns = [
         views.student_recommendation,
         name="student-recommendation",
     ),
-    path("attempts/", views.create_attempt, name="attempt-create"),
+    path("attempts/", views.attempt_collection, name="attempt-collection"),
     path("analyze-code/", views.analyze_code, name="analyze-code"),
 ]
