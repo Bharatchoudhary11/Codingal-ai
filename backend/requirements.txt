@@ -1,3 +1,4 @@
+-e ..  # Install the top-level "app" package so gunicorn can import app.wsgi
 Django>=5.0,<6.0
 djangorestframework>=3.15
 dj-database-url>=2.1
