@@ -11,7 +11,4 @@ requires-python = ">=3.10"
 dependencies = []
 
 [tool.setuptools]
-packages = {find = {}}
-
-[tool.setuptools.packages.find]
-include = ["app", "backend", "backend.*"]
+packages = {find = {include = ["app", "backend", "backend.*"]}}
