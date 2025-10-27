@@ -14,6 +14,13 @@ _allowed_hosts = config(
     cast=Csv(),
 )
 ALLOWED_HOSTS = list(_allowed_hosts) if _allowed_hosts else []
+
+_render_external_hostname = config(
+    "RENDER_EXTERNAL_HOSTNAME",
+    default="",
+).strip()
+if _render_external_hostname and _render_external_hostname not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_render_external_hostname)
 if DEBUG and not ALLOWED_HOSTS:
     ALLOWED_HOSTS = ["*"]
 
