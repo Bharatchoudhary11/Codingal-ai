@@ -155,7 +155,7 @@ def student_recommendation(request, pk: int):
         )
         latest_attempt = max(course_attempts, key=lambda attempt: attempt.timestamp, default=None)
         if latest_attempt is None:
-            recency_gap_days = float("inf")
+            recency_gap_days = 30.0
         else:
             recency_gap_days = (now - latest_attempt.timestamp).total_seconds() / 86400.0
         hint_rate = (
