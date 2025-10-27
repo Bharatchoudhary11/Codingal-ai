@@ -1,10 +1,13 @@
 import { parse } from '@babel/parser'
+import type { ParserOptions, ParserPlugin } from '@babel/parser'
 
 import type { Issue } from './index'
 
-const parserOptions = {
-  sourceType: 'module' as const,
-  plugins: ['jsx', 'typescript'] as const,
+const parserPlugins: ParserPlugin[] = ['jsx', 'typescript']
+
+const parserOptions: ParserOptions = {
+  sourceType: 'module',
+  plugins: parserPlugins,
   errorRecovery: true,
 }
 
